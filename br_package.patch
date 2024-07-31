@@ -1,0 +1,130 @@
+--- /dev/null	2024-07-31 07:25:38.527999898 +0000
++++ b/package/at24_poc/Config.in	2024-07-31 08:56:16.039982730 +0000
+@@ -0,0 +1,5 @@
++config BR2_PACKAGE_AT24_POC
++    bool "at24_poc"
++    help
++      tests at24 eeprom in the TI board
++
+--- /dev/null	2024-07-31 07:25:38.527999898 +0000
++++ b/package/at24_poc/at24_poc.mk	2024-07-31 09:19:35.539978311 +0000
+@@ -0,0 +1,18 @@
++AT24_POC_VERSION = 1.0
++AT24_POC_SITE = package/at24_poc/src
++#AT24_POC_SITE = at24_poc
++AT24_POC_SITE_METHOD = local
++AT24_POC_SOURCE = at24_poc.c
++
++define AT24_POC_BUILD_CMDS
++    $(TARGET_MAKE_ENV) $(MAKE) -C $(@D) CROSS_COMPILE=$(TARGET_CROSS)
++endef
++
++define AT24_POC_INSTALL_TARGET_CMDS
++    $(INSTALL) -D -m 0755 $(@D)/at24_poc $(TARGET_DIR)/usr/bin/at24_poc
++endef
++
++
++
++
++$(eval $(generic-package))
+--- /dev/null	2024-07-31 07:25:38.527999898 +0000
++++ b/package/at24_poc/src/at24_poc.c	2024-07-31 08:54:48.279983007 +0000
+@@ -0,0 +1,81 @@
++#include <stdio.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <fcntl.h>
++
++#define EEPROM_ARGUMENT 2
++#define RDWR_ARGUMENT 3
++#define MINIMAL_ARGUMENT 4
++#define OFFSET_ARGUMENT 4
++
++#define EEPROM_FN "/sys/devices/platform/bus@100000/bus@100000:bus@28380000/42120000.i2c/i2c-1/1-0050/eeprom"
++
++void read_eeprom(int fd, uint16_t offset, unsigned long read_count) {
++	char *buff = (char*) malloc(read_count * sizeof(char));
++	if (pread(fd, buff, read_count, offset) != read_count) {
++		printf("Error: could not read data from device\n");
++		close(fd);
++		exit(-1);
++	}
++	printf("Data read: ");
++	for (int i = 0; i < read_count; i++) {
++		printf("%02x ", buff[i]);
++	}
++	printf("\n");
++	close(fd);
++	free(buff);
++	exit(0);
++}
++
++void write_eeprom(int fd, uint16_t offset, const char* write_word) {
++	if (pwrite(fd, write_word, strlen(write_word),offset) != strlen(write_word)) {
++		printf("Error: could not write data to device\n");
++		exit(-1);
++	}
++	close(fd);
++	exit(0);
++}
++
++int main(int argc, char* argv[]) {
++	unsigned long read_count;
++	const char *mode = argv[1];
++	const char *write_word = argv[RDWR_ARGUMENT];
++	const char *eeprom;
++	uint16_t offset = 0x00;
++	int fd;
++
++	if (argc < MINIMAL_ARGUMENT) goto usage;
++	if (argv[OFFSET_ARGUMENT])
++		offset = strtoul(argv[OFFSET_ARGUMENT], NULL, 0);
++
++	if (!strcmp(argv[EEPROM_ARGUMENT], "at24"))
++		eeprom = EEPROM_FN;
++	else goto usage;
++
++	if (!strcmp(mode, "read")) {
++		read_count = strtoul(argv[RDWR_ARGUMENT], NULL, 0);
++		fd = open(eeprom, O_RDONLY);
++		if (fd < 0) 
++			goto open_error;
++		read_eeprom(fd, offset, read_count);
++	}
++
++	else if (!strcmp(mode, "write")) {
++		fd = open(eeprom, O_WRONLY);
++		if (fd < 0) goto open_error;
++		write_eeprom(fd, offset, write_word);
++	}
++	else goto usage;
++
++	return 0;
++
++usage:
++	printf("[read/write] [eeprom] [bytes to read/word to write] optional:[offset]\nSupported eeprom: at24");
++	return -1;
++
++open_error:
++	printf("Error: could not open device file %s\n", eeprom);
++	return -1;
++}
+--- /dev/null	2024-07-31 07:25:38.527999898 +0000
++++ b/package/at24_poc/src/Makefile	2024-07-31 09:20:37.127978116 +0000
+@@ -0,0 +1,4 @@
++CC = $(CROSS_COMPILE)gcc
++
++all:
++	$(CC) at24_poc.c -o at24_poc
+--- a/package/Config.in	2024-07-31 09:38:28.283974734 +0000
++++ b/package/Config.in	2024-07-31 09:00:36.955981906 +0000
+@@ -2296,6 +2296,7 @@
+ 
+ menu "Miscellaneous"
+ 	source "package/aespipe/Config.in"
++	source "package/at24_poc/Config.in"
+ 	source "package/bc/Config.in"
+ 	source "package/bitcoin/Config.in"
+ 	source "package/clamav/Config.in"

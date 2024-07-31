@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AT24_POC
+    bool "at24_poc"
+    help
+      tests at24 eeprom in the TI board
+
